@@ -1,0 +1,18 @@
+function(func arg)
+  if(DEFINED arg)
+    message("Function arg is a defined variable")
+  else()
+    message("Function arg is NOT a defined variable")
+  endif()
+endfunction()
+
+macro(macr arg)
+  if(DEFINED arg)
+    message("Macro arg is a defined variable")
+  else()
+    message("Macro arg is NOT a defined variable")
+  endif()
+endmacro()
+
+func(foobar)
+macr(foobar)
