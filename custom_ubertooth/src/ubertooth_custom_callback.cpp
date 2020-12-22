@@ -27,18 +27,9 @@
 using json = nlohmann::json;
 
 extern unsigned int packet_counter_max;
-extern int64_t space_mac;
-extern uint64_t space_pi_id;
-extern uint64_t space_area_id;
 
-  int8_t rssi_history[NUM_BREDR_CHANNELS][RSSI_HISTORY_LEN] = {{INT8_MIN}};
+int8_t rssi_history[NUM_BREDR_CHANNELS][RSSI_HISTORY_LEN] = {{INT8_MIN}};
 
-
-std::tuple<space::SubmitResult<space::UbertoothItem>, space::SubmitResult<uint32_t>> space::callback::generate_submits_pair(){
-  std::vector<space::UbertoothItem> vec1{};
-  std::vector<uint32_t> vec2;
-  return {space::SubmitResult<space::UbertoothItem>{vec1, "ubertooth", space_mac, space_pi_id, space_area_id}, space::SubmitResult<uint32_t>{vec2, "survey", space_mac, space_pi_id, space_area_id}};
-}
 
 
 int8_t cc2400_rssi_to_dbm(const int8_t rssi) {
@@ -433,7 +424,7 @@ void cb_ego(ubertooth_t *ut, void *args) {
 }
 
 void space::callback::cb_rx(ubertooth_t *ut, void *args) {
-  static auto [ubertooth, survey] = generate_submits_pair();
+  auto& [ubertooth, survey] = generate_submits_pair();
   btbb_packet *pkt = NULL;
   btbb_piconet *pn = (btbb_piconet *)args;
   char syms[BANK_LEN * 10] = {0};

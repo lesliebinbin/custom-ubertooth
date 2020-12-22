@@ -7,8 +7,18 @@
 #include <functional>
 #include <tuple>
 int space_mac;
-int space_pi_id;
-int space_area_id;
+uint64_t space_pi_id;
+uint64_t space_area_id;
+
+const std::vector<space::UbertoothItem> vec1{};
+const std::vector<uint32_t> vec2;
+std::tuple<space::SubmitResult<space::UbertoothItem>, space::SubmitResult<uint32_t>> result = {space::SubmitResult<space::UbertoothItem>{vec1, "ubertooth", space_mac, space_pi_id, space_area_id}, space::SubmitResult<uint32_t>{vec2, "survey", space_mac, space_pi_id, space_area_id}
+};
+
+
+std::tuple<space::SubmitResult<space::UbertoothItem>, space::SubmitResult<uint32_t>>& space::callback::generate_submits_pair(){
+  return result;
+}
 
 void space::callback::init_callback(uint64_t mac_, uint64_t pi_id_, uint64_t area_id_){
   space_mac = mac_;

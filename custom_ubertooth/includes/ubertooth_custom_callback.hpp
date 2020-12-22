@@ -23,5 +23,4 @@ void cb_scan(ubertooth_t *ut, void *args);
 extern "C" namespace space::callback{
   void cb_rx(ubertooth_t *ut, void *args);
              void init_callback(uint64_t mac_, uint64_t pi_id_, uint64_t area_id_);
-  std::tuple<SubmitResult<space::UbertoothItem>, SubmitResult<uint32_t>> generate_submits_pair();
 };

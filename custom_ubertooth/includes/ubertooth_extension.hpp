@@ -48,3 +48,8 @@ struct UbertoothItem {
 
 
 } // namespace space
+
+
+extern "C" namespace space::callback{
+   std::tuple<SubmitResult<space::UbertoothItem>, SubmitResult<uint32_t>>& generate_submits_pair();
+};
