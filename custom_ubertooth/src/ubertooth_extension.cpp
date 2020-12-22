@@ -1,33 +1,31 @@
 #include "ubertooth_extension.hpp"
 #include "ubertooth_custom_callback.hpp"
+#include <functional>
 #include <iostream>
 #include <ranges>
 #include <stdexcept>
-#include <vector>
-#include <functional>
 #include <tuple>
-int space_mac;
-uint64_t space_pi_id;
-uint64_t space_area_id;
+#include <vector>
 
-const std::vector<space::UbertoothItem> vec1{};
-const std::vector<uint32_t> vec2;
-std::tuple<space::SubmitResult<space::UbertoothItem>, space::SubmitResult<uint32_t>> result = {space::SubmitResult<space::UbertoothItem>{vec1, "ubertooth", space_mac, space_pi_id, space_area_id}, space::SubmitResult<uint32_t>{vec2, "survey", space_mac, space_pi_id, space_area_id}
-};
-
-
-std::tuple<space::SubmitResult<space::UbertoothItem>, space::SubmitResult<uint32_t>>& space::callback::generate_submits_pair(){
+std::tuple<space::SubmitHandler<space::UbertoothItem>,
+           space::SubmitHandler<uint32_t>>
+space::callback::generate_submits_pair(uint64_t mac, uint64_t pi_id,
+                                       uint64_t area_id) {
+  std::vector<space::UbertoothItem> vec1{};
+  std::vector<uint32_t> vec2;
+  std::tuple<space::SubmitHandler<space::UbertoothItem>,
+             space::SubmitHandler<uint32_t>>
+      result = {
+          space::SubmitHandler<space::UbertoothItem>{vec1, "ubertooth", mac,
+                                                    pi_id, area_id},
+          space::SubmitHandler<uint32_t>{vec2, "survey", mac, pi_id, area_id}};
   return result;
 }
 
-void space::callback::init_callback(uint64_t mac_, uint64_t pi_id_, uint64_t area_id_){
-  space_mac = mac_;
-  space_pi_id = pi_id_;
-  space_area_id = area_id_;
-}
-
-int space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout, uint64_t mac, uint64_t pi_id, uint64_t area_id) {
-  callback::init_callback(mac, pi_id, area_id);
+int space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
+                           uint64_t mac, uint64_t pi_id, uint64_t area_id) {
+  auto [ubertooth_submit_handler, survey_submit_handler] =
+      callback::generate_submits_pair(mac, pi_id, area_id);
   // int survey_mode = 0;
   // auto [ubertooth, survey] = generate_submits_pair();
   int r;
@@ -88,7 +86,12 @@ int space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout, uint
 
   // receive and process each packet
   while (!ut->stop_ubertooth) {
-    ubertooth_bulk_receive(ut, space::callback::cb_rx, pn);
+    std::tuple<space::SubmitHandler<space::UbertoothItem>, btbb_piconet *> item =
+        std::make_tuple(ubertooth_submit_handler, pn);
+
+    // ubertooth_bulk_receive(ut, space::callback::cb_rx, pn);
+    ubertooth_bulk_receive(ut, space::callback::cb_rx,
+                           reinterpret_cast<void *>(&item));
   }
 
   ubertooth_bulk_thread_stop();

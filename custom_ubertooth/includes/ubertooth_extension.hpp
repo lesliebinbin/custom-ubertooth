@@ -1,26 +1,29 @@
 #pragma once
-#include <nlohmann/json.hpp>
-#include <vector>
-#include <string>
 #include <chrono>
+#include <nlohmann/json.hpp>
+#include <string>
+#include <vector>
 namespace space {
-int start_ubertooth(int survey_mode, int max_ac_errors, int timeout, uint64_t mac, uint64_t pi_id, uint64_t area_id);
+int start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
+                    uint64_t mac, uint64_t pi_id, uint64_t area_id);
 // auto generate_submits_pair();
 
-template<typename Item>
-struct SubmitResult{
+template <typename Item> struct SubmitHandler {
   std::vector<Item> items;
   std::string type;
   int64_t submit_time;
   uint64_t mac;
   uint64_t pi_id;
   uint64_t area_id;
-  NLOHMANN_DEFINE_TYPE_INTRUSIVE(SubmitResult, items, type, mac, pi_id, area_id);
-  std::string submit(){
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(SubmitHandler, items, type, mac, pi_id,
+                                 area_id);
+  std::string submit() {
     using std::chrono::duration_cast;
     using std::chrono::milliseconds;
     using std::chrono::system_clock;
-    this->submit_time = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+    this->submit_time =
+        duration_cast<milliseconds>(system_clock::now().time_since_epoch())
+            .count();
     nlohmann::json j;
     nlohmann::to_json(j, *this);
     auto result = j.dump();
@@ -28,7 +31,6 @@ struct SubmitResult{
     return result;
   }
 };
-
 
 struct UbertoothItem {
   uint32_t systime;
@@ -45,11 +47,9 @@ struct UbertoothItem {
                                  clkn, clk_offset, s, n, snr);
 };
 
-
-
 } // namespace space
 
-
-extern "C" namespace space::callback{
-   std::tuple<SubmitResult<space::UbertoothItem>, SubmitResult<uint32_t>>& generate_submits_pair();
+extern "C" namespace space::callback {
+  std::tuple<SubmitHandler<space::UbertoothItem>, SubmitHandler<uint32_t>>
+  generate_submits_pair(uint64_t mac, uint64_t pi_id, uint64_t area_id);
 };

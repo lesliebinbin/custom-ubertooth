@@ -30,8 +30,6 @@ extern unsigned int packet_counter_max;
 
 int8_t rssi_history[NUM_BREDR_CHANNELS][RSSI_HISTORY_LEN] = {{INT8_MIN}};
 
-
-
 int8_t cc2400_rssi_to_dbm(const int8_t rssi) {
   /* models the cc2400 datasheet fig 22 for 1M as piece-wise linear */
   if (rssi < -48) {
@@ -47,10 +45,8 @@ int8_t cc2400_rssi_to_dbm(const int8_t rssi) {
   }
 }
 
-
 /* Ignore packets with a SNR lower than this in order to reduce
  * processor load.  TODO: this should be a command line parameter. */
-
 
 void determine_signal_and_noise(usb_pkt_rx *rx, int8_t *sig, int8_t *noise) {
   int8_t *channel_rssi_history = rssi_history[rx->channel];
@@ -424,9 +420,14 @@ void cb_ego(ubertooth_t *ut, void *args) {
 }
 
 void space::callback::cb_rx(ubertooth_t *ut, void *args) {
-  auto& [ubertooth, survey] = generate_submits_pair();
+  std::tuple<space::SubmitHandler<space::UbertoothItem>, btbb_piconet *>
+      *item_data =
+          reinterpret_cast<std::tuple<space::SubmitHandler<space::UbertoothItem>,
+                                      btbb_piconet *> *>(args);
+  auto [ubertooth_submit_handler, pn] = (*item_data);
+
   btbb_packet *pkt = NULL;
-  btbb_piconet *pn = (btbb_piconet *)args;
+  // btbb_piconet *pn = (btbb_piconet *)args;
   char syms[BANK_LEN * 10] = {0};
   int offset;
   uint16_t clk_offset;
@@ -527,10 +528,10 @@ void space::callback::cb_rx(ubertooth_t *ut, void *args) {
                                    noise_level,
                                    snr};
 
-  ubertooth.items.push_back(item);
-  if(ubertooth.items.size()>10){
-      std::cout<<ubertooth.submit()<<std::endl;
-    }
+  ubertooth_submit_handler.items.push_back(item);
+  if (ubertooth_submit_handler.items.size() > 10) {
+    std::cout << ubertooth_submit_handler.submit() << std::endl;
+  }
 
   /* calibrate Ubertooth clock such that the first bit of the AC
    * arrives CLK_TUNE_TIME after the rising edge of CLKN */

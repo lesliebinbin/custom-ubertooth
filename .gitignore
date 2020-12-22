@@ -1,0 +1,8 @@
+build
+.*
+!/.gitignore
+*.db
+out
+
+**/build
+.dir-locals.el
