@@ -1,5 +1,9 @@
-#include "ubertooth_extension.hpp"
 #include <iostream>
+
+namespace space {
+int start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
+                    uint64_t mac, uint64_t pi_id, uint64_t area_id);
+};
 int main(int argc, char *argv[]) {
 
   int survey_mode = 1;

@@ -2,7 +2,6 @@
 #include "ubertooth_custom_callback.hpp"
 #include <functional>
 #include <iostream>
-#include <ranges>
 #include <stdexcept>
 #include <tuple>
 #include <vector>
@@ -17,7 +16,7 @@ space::callback::generate_submits_pair(uint64_t mac, uint64_t pi_id,
              space::SubmitHandler<uint32_t>>
       result = {
           space::SubmitHandler<space::UbertoothItem>{vec1, "ubertooth", mac,
-                                                    pi_id, area_id},
+                                                     pi_id, area_id},
           space::SubmitHandler<uint32_t>{vec2, "survey", mac, pi_id, area_id}};
   return result;
 }
@@ -86,8 +85,8 @@ int space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
 
   // receive and process each packet
   while (!ut->stop_ubertooth) {
-    std::tuple<space::SubmitHandler<space::UbertoothItem>, btbb_piconet *> item =
-        std::make_tuple(ubertooth_submit_handler, pn);
+    std::tuple<space::SubmitHandler<space::UbertoothItem>, btbb_piconet *>
+        item = std::make_tuple(ubertooth_submit_handler, pn);
 
     // ubertooth_bulk_receive(ut, space::callback::cb_rx, pn);
     ubertooth_bulk_receive(ut, space::callback::cb_rx,
