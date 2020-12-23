@@ -11,10 +11,10 @@ int start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
 template <typename Item> struct SubmitHandler {
   std::vector<Item> items;
   std::string type;
-  int64_t submit_time;
   uint64_t mac;
   uint64_t pi_id;
   uint64_t area_id;
+  int64_t submit_time;
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(SubmitHandler, items, type, mac, pi_id,
                                  area_id);
   std::string submit() {
