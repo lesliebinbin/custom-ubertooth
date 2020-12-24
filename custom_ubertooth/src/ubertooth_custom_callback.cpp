@@ -419,7 +419,8 @@ void cb_ego(ubertooth_t *ut, void *args) {
   fflush(stdout);
 }
 
-void space::callback::cb_rx(ubertooth_t *ut, void *args) {
+namespace space::callback {
+void cb_rx(ubertooth_t *ut, void *args) {
   std::tuple<space::SubmitHandler<space::UbertoothItem>, btbb_piconet *>
       *item_data =
           reinterpret_cast<std::tuple<space::SubmitHandler<space::UbertoothItem>,
@@ -621,3 +622,4 @@ void space::callback::cb_rx(ubertooth_t *ut, void *args) {
     calibrated = 0;
   }
 }
+};

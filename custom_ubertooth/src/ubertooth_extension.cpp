@@ -1,10 +1,5 @@
 #include "ubertooth_extension.hpp"
-#include "ubertooth_custom_callback.hpp"
-#include <functional>
-#include <iostream>
 #include <stdexcept>
-#include <tuple>
-#include <vector>
 
 std::tuple<space::SubmitHandler<space::UbertoothItem>,
            space::SubmitHandler<uint32_t>>
