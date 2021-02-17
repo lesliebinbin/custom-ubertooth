@@ -1,5 +1,12 @@
 #include "ubertooth_extension.hpp"
 #include <stdexcept>
+#include <string>
+#include <vector>
+using std::string;
+using std::vector;
+
+space::SubmitHandler<space::UbertoothItem> *u_handler;
+space::SubmitHandler<uint32_t> *s_handler;
 
 std::tuple<space::SubmitHandler<space::UbertoothItem>,
            space::SubmitHandler<uint32_t>>
@@ -9,10 +16,10 @@ space::callback::generate_submits_pair(uint64_t mac, uint64_t pi_id,
   std::vector<uint32_t> vec2;
   std::tuple<space::SubmitHandler<space::UbertoothItem>,
              space::SubmitHandler<uint32_t>>
-      result = {
-          space::SubmitHandler<space::UbertoothItem>{vec1, "ubertooth", mac,
-                                                     pi_id, area_id},
-          space::SubmitHandler<uint32_t>{vec2, "survey", mac, pi_id, area_id}};
+      result = {space::SubmitHandler<space::UbertoothItem>{
+                    vec1, "ubertooth", mac, pi_id, area_id, 0},
+                space::SubmitHandler<uint32_t>{vec2, "survey", mac, pi_id,
+                                               area_id, 0}};
   return result;
 }
 
@@ -20,6 +27,8 @@ int space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
                            uint64_t mac, uint64_t pi_id, uint64_t area_id) {
   auto [ubertooth_submit_handler, survey_submit_handler] =
       callback::generate_submits_pair(mac, pi_id, area_id);
+  u_handler = &ubertooth_submit_handler;
+  s_handler = &survey_submit_handler;
   // int survey_mode = 0;
   // auto [ubertooth, survey] = generate_submits_pair();
   int r;

@@ -421,10 +421,10 @@ void cb_ego(ubertooth_t *ut, void *args) {
 
 namespace space::callback {
 void cb_rx(ubertooth_t *ut, void *args) {
-  std::tuple<space::SubmitHandler<space::UbertoothItem>, btbb_piconet *>
-      *item_data =
-          reinterpret_cast<std::tuple<space::SubmitHandler<space::UbertoothItem>,
-                                      btbb_piconet *> *>(args);
+  std::tuple<space::SubmitHandler<space::UbertoothItem>,
+             btbb_piconet *> *item_data =
+      reinterpret_cast<std::tuple<space::SubmitHandler<space::UbertoothItem>,
+                                  btbb_piconet *> *>(args);
   auto [ubertooth_submit_handler, pn] = (*item_data);
 
   btbb_packet *pkt = NULL;
@@ -519,7 +519,8 @@ void cb_rx(ubertooth_t *ut, void *args) {
   //        (uint32_t)time(NULL), btbb_packet_get_channel(pkt),
   //        btbb_packet_get_lap(pkt), btbb_packet_get_ac_errors(pkt), clkn,
   //        clk_offset, signal_level, noise_level, snr);
-  auto item = space::UbertoothItem{(uint32_t)time(NULL),
+  auto item = space::UbertoothItem{
+    (uint32_t)time(NULL),
                                    btbb_packet_get_channel(pkt),
                                    btbb_packet_get_lap(pkt),
                                    btbb_packet_get_ac_errors(pkt),
@@ -527,12 +528,20 @@ void cb_rx(ubertooth_t *ut, void *args) {
                                    clk_offset,
                                    signal_level,
                                    noise_level,
-                                   snr};
+                                   snr
+  };
+
+  if (ubertooth_submit_handler.current_length != 0) {
+    ubertooth_submit_handler.items.erase(
+        ubertooth_submit_handler.items.begin(),
+        ubertooth_submit_handler.items.begin() +
+            ubertooth_submit_handler.current_length);
+  }
 
   ubertooth_submit_handler.items.push_back(item);
-  if (ubertooth_submit_handler.items.size() > 10) {
-    std::cout << ubertooth_submit_handler.submit() << std::endl;
-  }
+  // if (ubertooth_submit_handler.items.size() > 10) {
+  //   std::cout << ubertooth_submit_handler.submit() << std::endl;
+  // }
 
   /* calibrate Ubertooth clock such that the first bit of the AC
    * arrives CLK_TUNE_TIME after the rising edge of CLKN */
@@ -622,4 +631,4 @@ void cb_rx(ubertooth_t *ut, void *args) {
     calibrated = 0;
   }
 }
-};
+}; // namespace space::callback
