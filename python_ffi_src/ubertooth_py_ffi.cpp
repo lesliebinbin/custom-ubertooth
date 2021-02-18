@@ -18,6 +18,8 @@ vector<string> ubertooth_results() { return u_handler->submit(); }
 
 vector<string> survey_results() { return s_handler->submit(); }
 
+vector<int> vector_to_py_list() { return vector<int>{1, 2, 3, 4, 5, 6, 7}; }
+
 int add(int a, int b) { return a + b; }
 PYBIND11_MODULE(space_ubertooth, m) {
   m.doc() = "ubertooth binding from c++ to python, fuck it"; // optional module
@@ -28,4 +30,6 @@ PYBIND11_MODULE(space_ubertooth, m) {
         "a function to collect ubertooth data");
   m.def("survey_results", survey_results,
         "a function to collect ubertooth data");
+  m.def("vector_to_py_list", vector_to_py_list,
+        "c++ vector convert to py list automatically");
 }
