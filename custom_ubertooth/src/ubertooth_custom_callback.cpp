@@ -21,13 +21,10 @@
 
 #include "ubertooth_custom_callback.hpp"
 #include <iostream>
+#include <set>
+
 #define CLOCK_TRIM_THRESHOLD 2
 #define RSSI_HISTORY_LEN 10
-/* maximum number of symbols */
-#define MAX_SYMBOLS 3125
-
-/* maximum number of payload bits */
-#define MAX_PAYLOAD_LENGTH 2744
 // for convenience
 using json = nlohmann::json;
 
@@ -35,6 +32,7 @@ extern unsigned int packet_counter_max;
 
 int8_t rssi_history[NUM_BREDR_CHANNELS][RSSI_HISTORY_LEN] = {{INT8_MIN}};
 
+std::set<void *> gc;
 int8_t cc2400_rssi_to_dbm(const int8_t rssi) {
   /* models the cc2400 datasheet fig 22 for 1M as piece-wise linear */
   if (rssi < -48) {
@@ -118,7 +116,7 @@ uint64_t now_ns_from_clk100ns(ubertooth_t *ut, const usb_pkt_rx *rx) {
  * search for UAP.
  */
 void cb_scan(ubertooth_t *ut, void *args __attribute__((unused))) {
-  btbb_packet *pkt = NULL;
+  btbb_packet *pkt = nullptr;
   int8_t signal_level;
   int8_t noise_level;
   int8_t snr;
@@ -425,17 +423,25 @@ void cb_ego(ubertooth_t *ut, void *args) {
 }
 
 extern "C" {
-#include <uthash.h>
-struct survey_hash {
-  uint32_t key; /* LAP */
-  btbb_piconet *pn;
-  UT_hash_handle hh;
-};
-static survey_hash *piconet_survey = NULL;
-static vector<survey_hash *> collector;
-btbb_piconet *my_get_piconet(uint32_t lap);
+static survey_hash *piconet_survey = nullptr;
+static survey_hash *initial_not_null = nullptr;
+
+void delete_all() {
+  survey_hash *current, *tmp;
+  cout << "the address of initial not null is: " << initial_not_null << endl;
+  HASH_ITER(hh, initial_not_null, current, tmp) {
+    HASH_DEL(initial_not_null,
+             current); /* delete it (users advances to next) */
+    free(current);     /* free it */
+  }
+  piconet_survey = nullptr;
+  initial_not_null = nullptr;
+}
 
 btbb_piconet *my_get_piconet(uint32_t lap) {
+  if (initial_not_null == nullptr && piconet_survey != nullptr) {
+    initial_not_null = piconet_survey;
+  }
   survey_hash *s;
   btbb_piconet *pn;
   HASH_FIND(hh, piconet_survey, &lap, 4, s);
@@ -451,70 +457,22 @@ btbb_piconet *my_get_piconet(uint32_t lap) {
   } else {
     pn = s->pn;
   }
-  collector.push_back(s);
+  gc.insert(pn);
   return pn;
 }
 
-struct btbb_packet {
+btbb_piconet *my_btbb_next_survey_result() {
+  btbb_piconet *pn = NULL;
+  survey_hash *tmp;
 
-  uint32_t refcount;
-
-  uint32_t flags;
-
-  uint8_t channel; /* Bluetooth channel (0-79) */
-  uint8_t UAP;     /* upper address part */
-  uint16_t NAP;    /* non-significant address part */
-  uint32_t LAP;    /* lower address part found in access code */
-
-  uint8_t modulation;
-  uint8_t transport;
-  uint8_t packet_type;
-  uint8_t packet_lt_addr; /* LLID field of payload header (2 bits) */
-  uint8_t packet_flags;   /* Flags - FLOW/ARQN/SQEN */
-  uint8_t packet_hec;     /* Flags - FLOW/ARQN/SQEN */
-
-  /* packet header, one bit per char */
-  char packet_header[18];
-
-  /* number of payload header bytes: 0, 1, 2, or -1 for
-   * unknown. payload is one bit per char. */
-  int payload_header_length;
-  char payload_header[16];
-
-  /* LLID field of payload header (2 bits) */
-  uint8_t payload_llid;
-
-  /* flow field of payload header (1 bit) */
-  uint8_t payload_flow;
-
-  /* payload length: the total length of the asynchronous data
-   * in bytes.  This does not include the length of synchronous
-   * data, such as the voice field of a DV packet.  If there is a
-   * payload header, this payload length is payload body length
-   * (the length indicated in the payload header's length field)
-   * plus payload_header_length plus 2 bytes CRC (if present).
-   */
-  int payload_length;
-
-  /* The actual payload data in host format
-   * Ready for passing to wireshark
-   * 2744 is the maximum length, but most packets are shorter.
-   * Dynamic allocation would probably be better in the long run but is
-   * problematic in the short run.
-   */
-  char payload[MAX_PAYLOAD_LENGTH];
-
-  uint16_t crc;
-  uint32_t clkn;     /* CLK1-27 of the packet */
-  uint8_t ac_errors; /* Number of bit errors in the AC */
-
-  /* the raw symbol stream (less the preamble), one bit per char */
-  // FIXME maybe this should be a vector so we can grow it only
-  // to the size needed and later shrink it if we find we have
-  // more symbols than necessary
-  uint16_t length; /* number of symbols */
-  char symbols[MAX_SYMBOLS];
-};
+  if (piconet_survey != NULL) {
+    pn = piconet_survey->pn;
+    tmp = piconet_survey;
+    piconet_survey = reinterpret_cast<survey_hash *>(piconet_survey->hh.next);
+  }
+  gc.insert(pn);
+  return pn;
+}
 }
 
 void my_cb_rx(ubertooth_t *ut, void *args) {
@@ -692,7 +650,7 @@ void my_cb_rx(ubertooth_t *ut, void *args) {
     fflush(dumpfile);
   }
 
-  r = btbb_process_packet(pkt, pn);
+  // r = btbb_process_packet(pkt, pn);
   pn = my_get_piconet(btbb_packet_get_lap(pkt));
   btbb_piconet_set_channel_seen(pn, pkt->channel);
   if (btbb_header_present(pkt) && !btbb_piconet_get_flag(pn, BTBB_UAP_VALID))

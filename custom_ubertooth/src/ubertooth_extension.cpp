@@ -1,7 +1,9 @@
 #include "ubertooth_extension.hpp"
+#include "ubertooth_custom_callback.hpp"
 #include <iostream>
 #include <list>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -9,7 +11,7 @@ using std::map;
 using std::string;
 using std::vector;
 space::SubmitHandler<space::UbertoothItem> *u_handler;
-
+extern std::set<void *> gc;
 map<string, vector<string>>
 space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
                        uint64_t mac, uint64_t pi_id, uint64_t area_id) {
@@ -69,6 +71,8 @@ space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
     // return r;
     return {};
 
+  // gc.insert(ut->rx_xfer);
+
   r = ubertooth_bulk_thread_start();
   if (r < 0)
     // return r;
@@ -94,7 +98,8 @@ space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
   u_handler = nullptr;
 
   printf("Survey Results\n");
-  while ((pn = btbb_next_survey_result()) != NULL) {
+  // while ((pn = btbb_next_survey_result()) != NULL) {
+  while ((pn = my_btbb_next_survey_result()) != NULL) {
     lap = btbb_piconet_get_lap(pn);
     uint32_t result = 0;
     if (btbb_piconet_get_flag(pn, BTBB_UAP_VALID)) {
@@ -112,12 +117,25 @@ space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
       result |= lap;
     }
     survey_submit_handler.items.push_back(result);
-    cout << "the address of pn is " << pn << endl;
-    free(pn);
   }
+
+  delete_all();
   auto final_survey_result = survey_submit_handler.submit();
   auto final_ubertooth_result = ubertooth_submit_handler.submit();
-  free(ut);
+  gc.insert(ut);
+  gc.insert(ut->fifo);
+  // gc.insert(ut->devh);
+  // gc.insert(ut->h_pcap_bredr);
+  // gc.insert(ut->h_pcap_le);
+  // gc.insert(ut->h_pcapng_bredr);
+  // gc.insert(ut->h_pcapng_le);
+  for (auto s : gc) {
+    cout << "the address of s is " << s << endl;
+    if (s != nullptr)
+      free(s);
+  }
+  gc.clear();
+  // libusb_free_transfer(ut->rx_xfer);
   return {{"survey_result", final_survey_result},
           {"ubertooth_result", final_ubertooth_result}};
 }
