@@ -23,6 +23,11 @@
 #include <iostream>
 #define CLOCK_TRIM_THRESHOLD 2
 #define RSSI_HISTORY_LEN 10
+/* maximum number of symbols */
+#define MAX_SYMBOLS 3125
+
+/* maximum number of payload bits */
+#define MAX_PAYLOAD_LENGTH 2744
 // for convenience
 using json = nlohmann::json;
 
@@ -68,7 +73,6 @@ void determine_signal_and_noise(usb_pkt_rx *rx, int8_t *sig, int8_t *noise) {
     rssi = MAX(rssi, channel_rssi_history[i]);
 #endif
   *sig = cc2400_rssi_to_dbm(rssi);
-
   /* Noise is an IIR of averages */
   /* FIXME: currently bogus */
   *noise = cc2400_rssi_to_dbm(rx->rssi_avg);
@@ -146,11 +150,12 @@ void cb_scan(ubertooth_t *ut, void *args __attribute__((unused))) {
   btbb_packet_set_data(pkt, syms + offset, BANK_LEN - offset, rx->channel,
                        clkn);
 
-  printf("systime=%u ch=%2d LAP=%06x err=%u clk100ns=%u clk1=%u s=%d n=%d "
-         "snr=%d\n",
-         (int)time(NULL), btbb_packet_get_channel(pkt),
-         btbb_packet_get_lap(pkt), btbb_packet_get_ac_errors(pkt), rx->clk100ns,
-         btbb_packet_get_clkn(pkt), signal_level, noise_level, snr);
+  // printf("systime=%u ch=%2d LAP=%06x err=%u clk100ns=%u clk1=%u s=%d n=%d "
+  //        "snr=%d\n",
+  //        (int)time(NULL), btbb_packet_get_channel(pkt),
+  //        btbb_packet_get_lap(pkt), btbb_packet_get_ac_errors(pkt),
+  //        rx->clk100ns, btbb_packet_get_clkn(pkt), signal_level, noise_level,
+  //        snr);
 
   btbb_process_packet(pkt, NULL);
 
@@ -375,9 +380,9 @@ void cb_btle(ubertooth_t *ut, void *args) {
     rx_ts += 3276800000;
   u32 ts_diff = rx_ts - prev_ts;
   prev_ts = rx->clk100ns;
-  printf("systime=%u freq=%d addr=%08x delta_t=%.03f ms rssi=%d\n", systime,
-         rx->channel + 2402, lell_get_access_address(pkt), ts_diff / 10000.0,
-         rx->rssi_min - 54);
+  // printf("systime=%u freq=%d addr=%08x delta_t=%.03f ms rssi=%d\n", systime,
+  //        rx->channel + 2402, lell_get_access_address(pkt), ts_diff / 10000.0,
+  //        rx->rssi_min - 54);
 
   int len = (rx->data[5] & 0x3f) + 6 + 3;
   if (len > 50)
@@ -419,11 +424,103 @@ void cb_ego(ubertooth_t *ut, void *args) {
   fflush(stdout);
 }
 
-namespace space::callback {
-void cb_rx(ubertooth_t *ut, void *args) {
-  std::tuple<space::SubmitHandler<space::UbertoothItem>,
+extern "C" {
+#include <uthash.h>
+struct survey_hash {
+  uint32_t key; /* LAP */
+  btbb_piconet *pn;
+  UT_hash_handle hh;
+};
+static survey_hash *piconet_survey = NULL;
+static vector<survey_hash *> collector;
+btbb_piconet *my_get_piconet(uint32_t lap);
+
+btbb_piconet *my_get_piconet(uint32_t lap) {
+  survey_hash *s;
+  btbb_piconet *pn;
+  HASH_FIND(hh, piconet_survey, &lap, 4, s);
+
+  if (s == NULL) {
+    pn = btbb_piconet_new();
+    btbb_init_piconet(pn, lap);
+
+    s = reinterpret_cast<survey_hash *>(malloc(sizeof(survey_hash)));
+    s->key = lap;
+    s->pn = pn;
+    HASH_ADD(hh, piconet_survey, key, 4, s);
+  } else {
+    pn = s->pn;
+  }
+  collector.push_back(s);
+  return pn;
+}
+
+struct btbb_packet {
+
+  uint32_t refcount;
+
+  uint32_t flags;
+
+  uint8_t channel; /* Bluetooth channel (0-79) */
+  uint8_t UAP;     /* upper address part */
+  uint16_t NAP;    /* non-significant address part */
+  uint32_t LAP;    /* lower address part found in access code */
+
+  uint8_t modulation;
+  uint8_t transport;
+  uint8_t packet_type;
+  uint8_t packet_lt_addr; /* LLID field of payload header (2 bits) */
+  uint8_t packet_flags;   /* Flags - FLOW/ARQN/SQEN */
+  uint8_t packet_hec;     /* Flags - FLOW/ARQN/SQEN */
+
+  /* packet header, one bit per char */
+  char packet_header[18];
+
+  /* number of payload header bytes: 0, 1, 2, or -1 for
+   * unknown. payload is one bit per char. */
+  int payload_header_length;
+  char payload_header[16];
+
+  /* LLID field of payload header (2 bits) */
+  uint8_t payload_llid;
+
+  /* flow field of payload header (1 bit) */
+  uint8_t payload_flow;
+
+  /* payload length: the total length of the asynchronous data
+   * in bytes.  This does not include the length of synchronous
+   * data, such as the voice field of a DV packet.  If there is a
+   * payload header, this payload length is payload body length
+   * (the length indicated in the payload header's length field)
+   * plus payload_header_length plus 2 bytes CRC (if present).
+   */
+  int payload_length;
+
+  /* The actual payload data in host format
+   * Ready for passing to wireshark
+   * 2744 is the maximum length, but most packets are shorter.
+   * Dynamic allocation would probably be better in the long run but is
+   * problematic in the short run.
+   */
+  char payload[MAX_PAYLOAD_LENGTH];
+
+  uint16_t crc;
+  uint32_t clkn;     /* CLK1-27 of the packet */
+  uint8_t ac_errors; /* Number of bit errors in the AC */
+
+  /* the raw symbol stream (less the preamble), one bit per char */
+  // FIXME maybe this should be a vector so we can grow it only
+  // to the size needed and later shrink it if we find we have
+  // more symbols than necessary
+  uint16_t length; /* number of symbols */
+  char symbols[MAX_SYMBOLS];
+};
+}
+
+void my_cb_rx(ubertooth_t *ut, void *args) {
+  std::tuple<space::SubmitHandler<space::UbertoothItem> *,
              btbb_piconet *> *item_data =
-      reinterpret_cast<std::tuple<space::SubmitHandler<space::UbertoothItem>,
+      reinterpret_cast<std::tuple<space::SubmitHandler<space::UbertoothItem> *,
                                   btbb_piconet *> *>(args);
   auto [ubertooth_submit_handler, pn] = (*item_data);
 
@@ -446,7 +543,6 @@ void cb_rx(ubertooth_t *ut, void *args) {
   ubertooth_unpack_symbols((uint8_t *)rx->data, syms);
 
   if (rx->pkt_type != BR_PACKET) {
-
     if (pkt)
       btbb_packet_unref(pkt);
     return;
@@ -519,29 +615,11 @@ void cb_rx(ubertooth_t *ut, void *args) {
   //        (uint32_t)time(NULL), btbb_packet_get_channel(pkt),
   //        btbb_packet_get_lap(pkt), btbb_packet_get_ac_errors(pkt), clkn,
   //        clk_offset, signal_level, noise_level, snr);
-  auto item = space::UbertoothItem{
-    (uint32_t)time(NULL),
-                                   btbb_packet_get_channel(pkt),
-                                   btbb_packet_get_lap(pkt),
-                                   btbb_packet_get_ac_errors(pkt),
-                                   clkn,
-                                   clk_offset,
-                                   signal_level,
-                                   noise_level,
-                                   snr
-  };
-
-  if (ubertooth_submit_handler.current_length != 0) {
-    ubertooth_submit_handler.items.erase(
-        ubertooth_submit_handler.items.begin(),
-        ubertooth_submit_handler.items.begin() +
-            ubertooth_submit_handler.current_length);
-  }
-
-  ubertooth_submit_handler.items.push_back(item);
-  // if (ubertooth_submit_handler.items.size() > 10) {
-  //   std::cout << ubertooth_submit_handler.submit() << std::endl;
-  // }
+  ubertooth_submit_handler->items.emplace_back(
+      (uint32_t)time(NULL), btbb_packet_get_channel(pkt),
+      btbb_packet_get_lap(pkt), btbb_packet_get_ac_errors(pkt), clkn,
+      clk_offset, signal_level, noise_level, snr);
+  // ubertooth_submit_handler->items.push_back(item);
 
   /* calibrate Ubertooth clock such that the first bit of the AC
    * arrives CLK_TUNE_TIME after the rising edge of CLKN */
@@ -615,6 +693,11 @@ void cb_rx(ubertooth_t *ut, void *args) {
   }
 
   r = btbb_process_packet(pkt, pn);
+  pn = my_get_piconet(btbb_packet_get_lap(pkt));
+  btbb_piconet_set_channel_seen(pn, pkt->channel);
+  if (btbb_header_present(pkt) && !btbb_piconet_get_flag(pn, BTBB_UAP_VALID))
+    btbb_uap_from_header(pkt, pn);
+  r = 0;
 
   /* Dump to PCAP/PCAPNG if specified */
   if (ut->h_pcap_bredr) {
@@ -630,5 +713,8 @@ void cb_rx(ubertooth_t *ut, void *args) {
     cmd_start_hopping(ut->devh, btbb_piconet_get_clk_offset(pn), 0);
     calibrated = 0;
   }
+
+  if (pkt)
+    btbb_packet_unref(pkt);
+  return;
 }
-}; // namespace space::callback

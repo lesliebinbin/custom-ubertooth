@@ -17,4 +17,4 @@ include_directories(custom_ubertooth/includes ${Boost_INCLUDE_DIRS} ${PYTHON_INC
 add_executable(ubertooth-custom ${ALL_SRCS})
 pybind11_add_module(space_ubertooth MODULE ${PYBIND11_SRCS})
 target_link_libraries(ubertooth-custom custom_ubertooth ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(space_ubertooth PRIVATE custom_ubertooth)
+target_link_libraries(space_ubertooth PRIVATE custom_ubertooth pybind11::embed)
