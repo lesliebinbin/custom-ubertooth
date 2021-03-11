@@ -20,3 +20,5 @@ extern "C" namespace space::callback {
 };
 
 void my_cb_rx(ubertooth_t *ut, void *args);
+
+std::vector<std::string> submit_my_ubertooth_items();

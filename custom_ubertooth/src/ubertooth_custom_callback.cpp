@@ -573,10 +573,13 @@ void my_cb_rx(ubertooth_t *ut, void *args) {
   //        (uint32_t)time(NULL), btbb_packet_get_channel(pkt),
   //        btbb_packet_get_lap(pkt), btbb_packet_get_ac_errors(pkt), clkn,
   //        clk_offset, signal_level, noise_level, snr);
-  ubertooth_submit_handler->items.emplace_back(
-      (uint32_t)time(NULL), btbb_packet_get_channel(pkt),
-      btbb_packet_get_lap(pkt), btbb_packet_get_ac_errors(pkt), clkn,
-      clk_offset, signal_level, noise_level, snr);
+
+  uint32_t my_lap = btbb_packet_get_lap(pkt);
+  if (my_lap != 0x9e8b33)
+    ubertooth_submit_handler->items.emplace_back(
+        (uint32_t)time(NULL), btbb_packet_get_channel(pkt), my_lap,
+        btbb_packet_get_ac_errors(pkt), clkn, clk_offset, signal_level,
+        noise_level, snr);
   // ubertooth_submit_handler->items.push_back(item);
 
   /* calibrate Ubertooth clock such that the first bit of the AC

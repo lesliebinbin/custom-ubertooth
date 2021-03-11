@@ -10,7 +10,15 @@
 using std::map;
 using std::string;
 using std::vector;
+
 space::SubmitHandler<space::UbertoothItem> *u_handler;
+
+std::vector<std::string> submit_my_ubertooth_items() {
+  if (u_handler == nullptr)
+    return {};
+  return u_handler->submit();
+}
+
 extern std::set<void *> gc;
 map<string, vector<string>>
 space::start_ubertooth(int survey_mode, int max_ac_errors, int timeout,
